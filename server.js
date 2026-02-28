@@ -55,7 +55,7 @@ Resposta curta e direta.
     const HF_API = process.env.HF_API;
 
     const response = await fetch(
-      "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3",
+      "https://api-inference.huggingface.co/models/google/flan-t5-large",
       {
         method: "POST",
 
@@ -70,7 +70,9 @@ Resposta curta e direta.
       }
     );
 
-    const data = await response.json();
+   const data = await response.json();
+
+console.log("HF RESPONSE:", data);
 
     res.json({
       result: data?.[0]?.generated_text || "Sem resposta IA"
