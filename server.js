@@ -12,7 +12,7 @@ app.use(express.json());
 
 
 // =======================
-// SAUDE BACKEND
+// SAUDE
 // =======================
 
 app.get("/saude",(req,res)=>{
@@ -23,20 +23,10 @@ res.send("Backend OK ✅");
 
 
 // =======================
-// FUNÇÃO IA CFO
+// IA
 // =======================
 
 async function gerarIA(prompt){
-
-const HF_API = process.env.HF_API;
-
-if(!HF_API){
-
-console.log("HF_API não configurada");
-
-return null;
-
-}
 
 try{
 
@@ -50,7 +40,7 @@ method:"POST",
 
 headers:{
 
-Authorization:`Bearer ${HF_API}`,
+Authorization:`Bearer ${process.env.HF_API}`,
 "Content-Type":"application/json"
 
 },
@@ -62,15 +52,13 @@ model:"meta-llama/Llama-3.1-8B-Instruct",
 messages:[
 
 {
-
 role:"user",
 content:prompt
-
 }
 
 ],
 
-max_tokens:600,
+max_tokens:250,
 temperature:0.3
 
 })
@@ -79,39 +67,11 @@ temperature:0.3
 
 );
 
-
-// evita erro JSON
-
-const text = await response.text();
-
-let data;
-
-try{
-
-data = JSON.parse(text);
-
-}catch{
-
-console.log("HF NÃO RETORNOU JSON:",text);
-
-return null;
-
-}
-
-
-if(data.error){
-
-console.log("HF ERRO:",data.error);
-
-return null;
-
-}
+const data = await response.json();
 
 return data?.choices?.[0]?.message?.content || null;
 
-}catch(e){
-
-console.log("Erro IA:",e);
+}catch{
 
 return null;
 
@@ -122,7 +82,7 @@ return null;
 
 
 // =======================
-// INSIGHT CFO
+// INSIGHT SAAS CFO
 // =======================
 
 app.post("/api/insight", async (req,res)=>{
@@ -132,95 +92,116 @@ try{
 const {
 
 transactions=[],
-budgets=[],
-loans=[],
-settings={}
+settings={},
+loans=[]
 
 }=req.body;
 
 
-// ====================
-// CALCULOS
-// ====================
+// DEBUG (IMPORTANTE)
+
+console.log("TRANSACTIONS RECEBIDO:");
+
+console.log(transactions);
 
 
-// receitas
+// ====================
+// NORMALIZAÇÃO
+// ====================
+
+function tipo(t){
+
+return String(t || "")
+
+.toLowerCase()
+
+.normalize("NFD")
+
+.replace(/[\u0300-\u036f]/g,"");
+
+}
+
+
+// ====================
+// RECEITAS
+// ====================
 
 const receitas = transactions
 
-.filter(t=>
+.filter(t=>{
 
-t.type==="income" ||
-t.type==="receita" ||
-t.type==="entrada"
+const tp = tipo(t.type);
 
-)
+return(
 
-.reduce((total,item)=>
+tp.includes("income") ||
+tp.includes("receita") ||
+tp.includes("entrada") ||
+tp.includes("ganho") ||
+tp.includes("credito")
 
-total + Number(item.amount || 0)
+);
 
-,0);
+})
+
+.reduce((a,b)=>a+Number(b.amount||0),0);
 
 
-// despesas
+// ====================
+// DESPESAS
+// ====================
 
 const despesas = transactions
 
-.filter(t=>
+.filter(t=>{
 
-t.type==="expense" ||
-t.type==="despesa"
+const tp = tipo(t.type);
 
-)
+return(
 
-.reduce((total,item)=>
+tp.includes("expense") ||
+tp.includes("despesa") ||
+tp.includes("saida") ||
+tp.includes("gasto")
 
-total + Number(item.amount || 0)
+);
 
-,0);
+})
+
+.reduce((a,b)=>a+Number(b.amount||0),0);
 
 
 
 const saldo = receitas - despesas;
 
 
-// média diária
-
-const mediaDiariaDespesa = despesas / 30;
-
-
 // previsão
 
-const previsao90dias = saldo - (mediaDiariaDespesa * 90);
+const previsao90dias = saldo - ((despesas/30)*90);
 
 
-// ====================
-// SCORE
-// ====================
+// score matemático
 
-let score = 100;
+let score=100;
 
-if(despesas > receitas) score -= 40;
+if(despesas>receitas)score-=40;
 
-if(loans.length > 0) score -= 20;
+if(loans.length>0)score-=20;
 
-if(previsao90dias < 0) score -= 30;
+if(previsao90dias<0)score-=30;
 
-if(score < 0) score = 0;
+if(score<0)score=0;
 
 
-// ====================
-// RISCO
-// ====================
+// risco
 
 let risco="baixo";
 
-if(previsao90dias <0){
+if(previsao90dias<0){
 
 risco="alto";
 
-}else if(previsao90dias < saldo*0.5){
+}else if(previsao90dias<saldo*0.5){
 
 risco="medio";
 
@@ -228,86 +209,66 @@ risco="medio";
 
 
 // ====================
-// PROMPT IA
+// PROMPT SAAS
 // ====================
 
-const prompt = `
+const prompt=`
 
-Você é um CFO profissional brasileiro.
-
-Analise apenas números.
+Você é CFO brasileiro.
 
 Empresa:
 
 ${settings.companyName || "Empresa"}
 
-Receita mensal:
+Receita:
 
-R$ ${receitas.toFixed(2)}
+${receitas}
 
-Despesas mensais:
+Despesa:
 
-R$ ${despesas.toFixed(2)}
+${despesas}
 
-Saldo atual:
+Saldo:
 
-R$ ${saldo.toFixed(2)}
+${saldo}
 
-Previsão financeira 90 dias:
+Score:
 
-R$ ${previsao90dias.toFixed(2)}
-
-Score financeiro:
-
-${score}/100
+${score}
 
 Risco:
 
 ${risco}
 
-Responda em no máximo 4 linhas.
-
-Formato:
+Responda curto:
 
 Situação:
 Problema:
 Conselho:
-Oportunidade:
-
-Sem textos longos.
 
 `;
-
-
-// chama IA
 
 const resposta = await gerarIA(prompt);
 
 
-// ====================
-// FALLBACK
-// ====================
+// fallback
 
-const fallback = `
+const fallback =
 
-Situação: Score ${score}/100.
+`Situação financeira ${risco}.
+Score ${score}/100.
+Revise despesas.`;
 
-Risco ${risco}.
-
-Controle despesas fixas e aumente entrada de caixa.
-
-`;
-
-
-// resposta
 
 res.json({
 
-result: resposta || fallback,
+result:resposta || fallback,
 
+saldo,
+receitas,
+despesas,
 score,
-risco,
-previsao90dias
+risco
 
 });
 
@@ -317,7 +278,7 @@ console.log(e);
 
 res.status(500).json({
 
-result:"Erro IA backend"
+result:"Erro IA"
 
 });
 
@@ -327,13 +288,11 @@ result:"Erro IA backend"
 
 
 // =======================
-// START SERVER
-// =======================
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT,()=>{
 
-console.log("🔥 Backend rodando CFO PRO");
+console.log("🔥 CFO SAAS ONLINE");
 
 });
