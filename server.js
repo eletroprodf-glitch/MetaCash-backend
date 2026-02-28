@@ -10,6 +10,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+
 // =======================
 // SAUDE
 // =======================
@@ -22,12 +23,20 @@ res.send("Backend OK ✅");
 
 
 // =======================
-// FUNÇÃO IA (HF CHAT API)
+// FUNÇÃO IA
 // =======================
 
 async function gerarIA(prompt){
 
 const HF_API = process.env.HF_API;
+
+if(!HF_API){
+
+console.log("HF_API não configurada");
+
+return null;
+
+}
 
 try{
 
@@ -53,24 +62,20 @@ model:"meta-llama/Llama-3.1-8B-Instruct",
 messages:[
 
 {
-
 role:"user",
 content:prompt
-
 }
 
 ],
 
-max_tokens:300
+max_tokens:600,
+temperature:0.4
 
 })
 
 }
 
 );
-
-
-// caso venha erro HTML ou texto
 
 const text = await response.text();
 
@@ -87,8 +92,6 @@ console.log("HF NÃO RETORNOU JSON:",text);
 return null;
 
 }
-
-console.log("HF RESPONSE:",data);
 
 if(data.error){
 
@@ -111,8 +114,9 @@ return null;
 }
 
 
+
 // =======================
-// INSIGHT CFO PROFISSIONAL
+// INSIGHT CFO
 // =======================
 
 app.post("/api/insight", async (req,res)=>{
@@ -130,16 +134,35 @@ settings={}
 
 
 // ====================
-// CALCULOS
+// CALCULOS SEGUROS
 // ====================
 
 const receitas = transactions
-.filter(t=>t.type==="income")
-.reduce((a,b)=>a+(b.amount||0),0);
+
+.filter(t=>
+
+t.type==="income" ||
+t.type==="receita" ||
+t.type==="entrada"
+
+)
+
+.reduce((a,b)=>a + Number(b.amount || 0),0);
+
+
 
 const despesas = transactions
-.filter(t=>t.type==="expense")
-.reduce((a,b)=>a+(b.amount||0),0);
+
+.filter(t=>
+
+t.type==="expense" ||
+t.type==="despesa"
+
+)
+
+.reduce((a,b)=>a + Number(b.amount || 0),0);
+
+
 
 const saldo = receitas - despesas;
 
@@ -181,64 +204,58 @@ risco="medio";
 
 
 // ====================
-// PROMPT
+// PROMPT CFO INTELIGENTE
 // ====================
 
 const prompt = `
 
-Você é um CFO especialista financeiro brasileiro.
+Você é um CFO brasileiro profissional.
 
-Responda em português.
+Analise SOMENTE os números abaixo.
 
 Empresa:
 
 ${settings.companyName || "Empresa"}
 
-Receitas:
+Receita mensal:
 
-${receitas}
+R$ ${receitas.toFixed(2)}
 
-Despesas:
+Despesas mensais:
 
-${despesas}
+R$ ${despesas.toFixed(2)}
 
 Saldo atual:
 
-${saldo}
+R$ ${saldo.toFixed(2)}
 
-Previsão 90 dias:
+Previsão financeira 90 dias:
 
-${previsao90dias}
+R$ ${previsao90dias.toFixed(2)}
 
-Score:
+Score financeiro:
 
-${score}
+${score}/100
 
 Risco:
 
 ${risco}
 
-Créditos:
+Responda em no máximo 4 linhas.
 
-${JSON.stringify(loans)}
+Formato:
 
-Orçamentos:
+Situação:
+Problema:
+Conselho:
+Oportunidade:
 
-${JSON.stringify(budgets)}
-
-Responda:
-
-1 Situação financeira.
-
-2 Maior problema.
-
-3 Conselho do dia.
-
-4 Oportunidade.
-
-Resposta curta.
+Sem textos longos.
 
 `;
+
+
+// 🔥 AGORA SIM CHAMA IA
 
 const resposta = await gerarIA(prompt);
 
@@ -249,13 +266,11 @@ const resposta = await gerarIA(prompt);
 
 const fallback = `
 
-Empresa ${settings.companyName || ""}
-
-Score Financeiro ${score}/100.
+Situação: Score ${score}/100.
 
 Risco ${risco}.
 
-Controle despesas fixas e aumente caixa.
+Revise despesas e aumente fluxo de caixa.
 
 `;
 
@@ -264,9 +279,7 @@ res.json({
 result: resposta || fallback,
 
 score,
-
 risco,
-
 previsao90dias
 
 });
