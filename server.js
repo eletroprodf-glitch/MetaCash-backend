@@ -117,7 +117,9 @@ settings={}
 }=req.body;
 
 
+// ====================
 // CALCULOS
+// ====================
 
 const receitas = transactions
 .filter(t=>t.type==="income")
@@ -127,58 +129,102 @@ const despesas = transactions
 .filter(t=>t.type==="expense")
 .reduce((a,b)=>a+(b.amount||0),0);
 
-const saldoAtual = receitas - despesas;
+const saldo = receitas - despesas;
 
 
-// previsão simples
+// média diária
 
-const mediaDespesa = despesas/30;
-
-const previsao30dias = saldoAtual - (mediaDespesa*30);
+const mediaDiariaDespesa = despesas / 30;
 
 
-// risco
+// previsão 90 dias
+
+const previsao90dias = saldo - (mediaDiariaDespesa * 90);
+
+
+// ====================
+// SCORE FINANCEIRO
+// ====================
+
+let score = 100;
+
+if(despesas > receitas){
+
+score -= 40;
+
+}
+
+if(loans.length > 0){
+
+score -= 20;
+
+}
+
+if(previsao90dias < 0){
+
+score -= 30;
+
+}
+
+if(score < 0){
+
+score = 0;
+
+}
+
+
+// ====================
+// RISCO
+// ====================
 
 let risco="baixo";
 
-if(previsao30dias <0){
+if(previsao90dias <0){
 
 risco="alto";
 
-}else if(previsao30dias < saldoAtual*0.3){
+}else if(previsao90dias < saldo*0.5){
 
 risco="medio";
 
 }
 
 
-// PROMPT CFO
+// ====================
+// PROMPT CFO PREMIUM
+// ====================
 
 const prompt = `
 
-Você é um CFO especialista financeiro empresarial.
+Você é um CFO especialista financeiro brasileiro.
+
+Responda SEMPRE em português.
 
 Empresa:
 
 ${settings.companyName || "Empresa"}
 
-Receitas:
+Receita total:
 
 ${receitas}
 
-Despesas:
+Despesas totais:
 
 ${despesas}
 
 Saldo atual:
 
-${saldoAtual}
+${saldo}
 
-Previsão 30 dias:
+Previsão financeira 90 dias:
 
-${previsao30dias}
+${previsao90dias}
 
-Risco financeiro:
+Score financeiro:
+
+${score}
+
+Risco:
 
 ${risco}
 
@@ -190,30 +236,48 @@ Orçamentos:
 
 ${JSON.stringify(budgets)}
 
-Analise e responda:
+Responda:
 
-1 Situação financeira atual.
+1 Situação financeira.
 
-2 Maior erro financeiro detectado.
+2 Maior problema.
 
-3 Risco de caixa.
+3 Conselho do dia.
 
-4 Melhor ação HOJE.
+4 Oportunidade de crescimento.
 
-Resposta curta direta profissional.
+Resposta curta objetiva.
 
 `;
 
 const resposta = await gerarIA(prompt);
 
+
+// ====================
+// FALLBACK (NUNCA FICA SEM)
+// ====================
+
+const fallback = `
+
+Empresa ${settings.companyName || ""}
+
+Score Financeiro: ${score}/100.
+
+Risco ${risco}.
+
+Controle despesas fixas, aumente entrada de caixa e revise créditos ativos semanalmente.
+
+`;
+
 res.json({
 
-result:
+result: resposta || fallback,
 
-resposta ||
+score,
 
-`Empresa ${settings.companyName || ""} apresenta risco ${risco}. 
-Revise despesas fixas imediatamente e fortaleça fluxo de caixa semanal.`
+risco,
+
+previsao90dias
 
 });
 
@@ -230,7 +294,6 @@ result:"Erro IA backend"
 }
 
 });
-
 
 // =======================
 
