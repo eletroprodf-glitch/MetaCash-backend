@@ -23,6 +23,9 @@ res.send("Backend OK ✅");
 // =======================
 // IA MULTI MODELO
 // =======================
+// =======================
+// FUNÇÃO IA
+// =======================
 
 async function gerarIA(prompt){
 
@@ -41,7 +44,6 @@ method:"POST",
 headers:{
 
 Authorization:`Bearer ${HF_API}`,
-
 "Content-Type":"application/json"
 
 },
@@ -53,11 +55,8 @@ model:"HuggingFaceH4/zephyr-7b-beta",
 messages:[
 
 {
-
 role:"user",
-
 content:prompt
-
 }
 
 ],
@@ -73,9 +72,6 @@ max_tokens:300
 const data = await response.json();
 
 console.log("HF RESPONSE:",data);
-
-
-// resposta estilo chat
 
 return data?.choices?.[0]?.message?.content || null;
 
