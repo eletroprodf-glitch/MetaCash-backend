@@ -48,7 +48,7 @@ Authorization:`Bearer ${HF_API}`,
 
 body:JSON.stringify({
 
-model:"HuggingFaceH4/zephyr-7b-beta",
+model:"meta-llama/Llama-3.1-8B-Instruct",
 
 messages:[
 
