@@ -32,7 +32,7 @@ try{
 
 const response = await fetch(
 
-"https://router.huggingface.co/hf-inference/models/google/flan-t5-large",
+"https://router.huggingface.co/v1/chat/completions",
 
 {
 
@@ -48,7 +48,21 @@ Authorization:`Bearer ${HF_API}`,
 
 body:JSON.stringify({
 
-inputs:prompt
+model:"HuggingFaceH4/zephyr-7b-beta",
+
+messages:[
+
+{
+
+role:"user",
+
+content:prompt
+
+}
+
+],
+
+max_tokens:300
 
 })
 
@@ -56,31 +70,24 @@ inputs:prompt
 
 );
 
+const data = await response.json();
 
-// 👇 NÃO PARSEIA DIRETO
-
-const texto = await response.text();
-
-console.log("HF RAW:",texto);
+console.log("HF RESPONSE:",data);
 
 
-// tenta converter
+// resposta estilo chat
 
-let data;
+return data?.choices?.[0]?.message?.content || null;
 
-try{
+}catch(e){
 
-data = JSON.parse(texto);
-
-}catch{
-
-console.log("HF não retornou JSON");
+console.log("Erro IA:",e);
 
 return null;
 
 }
 
-
+}
 // erro HF
 
 if(data.error){
