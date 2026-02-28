@@ -66,7 +66,7 @@ inputs:prompt
 );
 
 const data = await response.json();
-
+console.log("HF RESPONSE:",data);
 console.log("HF:",modelo,data);
 
 if(data?.error){
