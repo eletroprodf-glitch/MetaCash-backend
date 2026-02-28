@@ -11,7 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 // =======================
-// TESTE BACKEND
+// SAUDE
 // =======================
 
 app.get("/saude",(req,res)=>{
@@ -21,7 +21,7 @@ res.send("Backend OK ✅");
 });
 
 // =======================
-// FUNÇÃO IA
+// IA MULTI MODELO
 // =======================
 
 async function gerarIA(prompt){
@@ -35,7 +35,6 @@ const modelos=[
 
 ];
 
-// tenta modelos diferentes
 for(const modelo of modelos){
 
 try{
@@ -76,7 +75,6 @@ continue;
 
 }
 
-// formatos diferentes HF
 if(Array.isArray(data)){
 
 return data[0]?.generated_text;
@@ -91,7 +89,7 @@ return data.generated_text;
 
 }catch(e){
 
-console.log("Erro modelo:",modelo,e);
+console.log(e);
 
 }
 
@@ -102,17 +100,24 @@ return null;
 }
 
 // =======================
-// IA INSIGHT CFO
+// INSIGHT CFO PROFISSIONAL
 // =======================
 
 app.post("/api/insight", async (req,res)=>{
 
 try{
 
-const { transactions=[],budgets=[],loans=[],settings={} } = req.body;
+const {
+
+transactions=[],
+budgets=[],
+loans=[],
+settings={}
+
+}=req.body;
 
 
-// calcula números rápidos
+// CALCULOS
 
 const receitas = transactions
 .filter(t=>t.type==="income")
@@ -122,50 +127,93 @@ const despesas = transactions
 .filter(t=>t.type==="expense")
 .reduce((a,b)=>a+(b.amount||0),0);
 
-const saldo = receitas - despesas;
+const saldoAtual = receitas - despesas;
 
 
-// PROMPT NIVEL CFO
+// previsão simples
+
+const mediaDespesa = despesas/30;
+
+const previsao30dias = saldoAtual - (mediaDespesa*30);
+
+
+// risco
+
+let risco="baixo";
+
+if(previsao30dias <0){
+
+risco="alto";
+
+}else if(previsao30dias < saldoAtual*0.3){
+
+risco="medio";
+
+}
+
+
+// PROMPT CFO
 
 const prompt = `
 
-Você é um CFO especialista financeiro.
+Você é um CFO especialista financeiro empresarial.
 
-Empresa: ${settings.companyName || "Empresa"}
+Empresa:
 
-Receita total: ${receitas}
+${settings.companyName || "Empresa"}
 
-Despesas totais: ${despesas}
+Receitas:
 
-Saldo atual: ${saldo}
+${receitas}
+
+Despesas:
+
+${despesas}
+
+Saldo atual:
+
+${saldoAtual}
+
+Previsão 30 dias:
+
+${previsao30dias}
+
+Risco financeiro:
+
+${risco}
 
 Créditos:
 
 ${JSON.stringify(loans)}
 
+Orçamentos:
+
+${JSON.stringify(budgets)}
+
 Analise e responda:
 
 1 Situação financeira atual.
 
-2 Grau de risco (baixo médio alto).
+2 Maior erro financeiro detectado.
 
-3 Maior erro financeiro.
+3 Risco de caixa.
 
 4 Melhor ação HOJE.
 
-Resposta curta objetiva profissional.
+Resposta curta direta profissional.
 
 `;
 
-const respostaIA = await gerarIA(prompt);
+const resposta = await gerarIA(prompt);
 
 res.json({
 
 result:
 
-respostaIA ||
+resposta ||
 
-"Situação equilibrada. Revise despesas recorrentes e fortaleça fluxo de caixa semanal."
+`Empresa ${settings.companyName || ""} apresenta risco ${risco}. 
+Revise despesas fixas imediatamente e fortaleça fluxo de caixa semanal.`
 
 });
 
@@ -183,12 +231,13 @@ result:"Erro IA backend"
 
 });
 
+
 // =======================
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT,()=>{
 
-console.log("🔥 Backend rodando");
+console.log("🔥 Backend rodando CFO PRO");
 
 });
