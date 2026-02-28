@@ -12,7 +12,7 @@ app.use(express.json());
 
 
 // =======================
-// SAUDE
+// SAUDE BACKEND
 // =======================
 
 app.get("/saude",(req,res)=>{
@@ -23,7 +23,7 @@ res.send("Backend OK ✅");
 
 
 // =======================
-// FUNÇÃO IA
+// FUNÇÃO IA CFO
 // =======================
 
 async function gerarIA(prompt){
@@ -62,20 +62,25 @@ model:"meta-llama/Llama-3.1-8B-Instruct",
 messages:[
 
 {
+
 role:"user",
 content:prompt
+
 }
 
 ],
 
 max_tokens:600,
-temperature:0.4
+temperature:0.3
 
 })
 
 }
 
 );
+
+
+// evita erro JSON
 
 const text = await response.text();
 
@@ -92,6 +97,7 @@ console.log("HF NÃO RETORNOU JSON:",text);
 return null;
 
 }
+
 
 if(data.error){
 
@@ -134,8 +140,11 @@ settings={}
 
 
 // ====================
-// CALCULOS SEGUROS
+// CALCULOS
 // ====================
+
+
+// receitas
 
 const receitas = transactions
 
@@ -147,9 +156,14 @@ t.type==="entrada"
 
 )
 
-.reduce((a,b)=>a + Number(b.amount || 0),0);
+.reduce((total,item)=>
+
+total + Number(item.amount || 0)
+
+,0);
 
 
+// despesas
 
 const despesas = transactions
 
@@ -160,13 +174,23 @@ t.type==="despesa"
 
 )
 
-.reduce((a,b)=>a + Number(b.amount || 0),0);
+.reduce((total,item)=>
+
+total + Number(item.amount || 0)
+
+,0);
 
 
 
 const saldo = receitas - despesas;
 
+
+// média diária
+
 const mediaDiariaDespesa = despesas / 30;
+
+
+// previsão
 
 const previsao90dias = saldo - (mediaDiariaDespesa * 90);
 
@@ -204,14 +228,14 @@ risco="medio";
 
 
 // ====================
-// PROMPT CFO INTELIGENTE
+// PROMPT IA
 // ====================
 
 const prompt = `
 
-Você é um CFO brasileiro profissional.
+Você é um CFO profissional brasileiro.
 
-Analise SOMENTE os números abaixo.
+Analise apenas números.
 
 Empresa:
 
@@ -255,7 +279,7 @@ Sem textos longos.
 `;
 
 
-// 🔥 AGORA SIM CHAMA IA
+// chama IA
 
 const resposta = await gerarIA(prompt);
 
@@ -270,9 +294,12 @@ Situação: Score ${score}/100.
 
 Risco ${risco}.
 
-Revise despesas e aumente fluxo de caixa.
+Controle despesas fixas e aumente entrada de caixa.
 
 `;
+
+
+// resposta
 
 res.json({
 
@@ -299,6 +326,8 @@ result:"Erro IA backend"
 });
 
 
+// =======================
+// START SERVER
 // =======================
 
 const PORT = process.env.PORT || 5000;
