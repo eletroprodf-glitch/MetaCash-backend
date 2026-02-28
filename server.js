@@ -28,20 +28,11 @@ async function gerarIA(prompt){
 
 const HF_API = process.env.HF_API;
 
-const modelos=[
-
-"google/flan-t5-large",
-"HuggingFaceH4/zephyr-7b-beta"
-
-];
-
-for(const modelo of modelos){
-
 try{
 
 const response = await fetch(
 
-`https://router.huggingface.co/hf-inference/models/${modelo}`,
+"https://router.huggingface.co/hf-inference/models/google/flan-t5-large",
 
 {
 
@@ -65,15 +56,43 @@ inputs:prompt
 
 );
 
-const data = await response.json();
-console.log("HF RESPONSE:",data);
-console.log("HF:",modelo,data);
 
-if(data?.error){
+// 👇 NÃO PARSEIA DIRETO
 
-continue;
+const texto = await response.text();
+
+console.log("HF RAW:",texto);
+
+
+// tenta converter
+
+let data;
+
+try{
+
+data = JSON.parse(texto);
+
+}catch{
+
+console.log("HF não retornou JSON");
+
+return null;
 
 }
+
+
+// erro HF
+
+if(data.error){
+
+console.log("HF ERRO:",data.error);
+
+return null;
+
+}
+
+
+// formatos HF
 
 if(Array.isArray(data)){
 
@@ -81,24 +100,17 @@ return data[0]?.generated_text;
 
 }
 
-if(data.generated_text){
-
-return data.generated_text;
-
-}
+return data.generated_text || null;
 
 }catch(e){
 
-console.log(e);
-
-}
-
-}
+console.log("Erro IA:",e);
 
 return null;
 
 }
 
+}
 // =======================
 // INSIGHT CFO PROFISSIONAL
 // =======================
