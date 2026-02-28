@@ -20,11 +20,9 @@ res.send("Backend OK ✅");
 
 });
 
+
 // =======================
-// IA MULTI MODELO
-// =======================
-// =======================
-// FUNÇÃO IA
+// FUNÇÃO IA (HF CHAT API)
 // =======================
 
 async function gerarIA(prompt){
@@ -55,8 +53,10 @@ model:"HuggingFaceH4/zephyr-7b-beta",
 messages:[
 
 {
+
 role:"user",
 content:prompt
+
 }
 
 ],
@@ -69,9 +69,34 @@ max_tokens:300
 
 );
 
-const data = await response.json();
+
+// caso venha erro HTML ou texto
+
+const text = await response.text();
+
+let data;
+
+try{
+
+data = JSON.parse(text);
+
+}catch{
+
+console.log("HF NÃO RETORNOU JSON:",text);
+
+return null;
+
+}
 
 console.log("HF RESPONSE:",data);
+
+if(data.error){
+
+console.log("HF ERRO:",data.error);
+
+return null;
+
+}
 
 return data?.choices?.[0]?.message?.content || null;
 
@@ -84,36 +109,8 @@ return null;
 }
 
 }
-// erro HF
-
-if(data.error){
-
-console.log("HF ERRO:",data.error);
-
-return null;
-
-}
 
 
-// formatos HF
-
-if(Array.isArray(data)){
-
-return data[0]?.generated_text;
-
-}
-
-return data.generated_text || null;
-
-}catch(e){
-
-console.log("Erro IA:",e);
-
-return null;
-
-}
-
-}
 // =======================
 // INSIGHT CFO PROFISSIONAL
 // =======================
@@ -146,46 +143,24 @@ const despesas = transactions
 
 const saldo = receitas - despesas;
 
-
-// média diária
-
 const mediaDiariaDespesa = despesas / 30;
-
-
-// previsão 90 dias
 
 const previsao90dias = saldo - (mediaDiariaDespesa * 90);
 
 
 // ====================
-// SCORE FINANCEIRO
+// SCORE
 // ====================
 
 let score = 100;
 
-if(despesas > receitas){
+if(despesas > receitas) score -= 40;
 
-score -= 40;
+if(loans.length > 0) score -= 20;
 
-}
+if(previsao90dias < 0) score -= 30;
 
-if(loans.length > 0){
-
-score -= 20;
-
-}
-
-if(previsao90dias < 0){
-
-score -= 30;
-
-}
-
-if(score < 0){
-
-score = 0;
-
-}
+if(score < 0) score = 0;
 
 
 // ====================
@@ -206,24 +181,24 @@ risco="medio";
 
 
 // ====================
-// PROMPT CFO PREMIUM
+// PROMPT
 // ====================
 
 const prompt = `
 
 Você é um CFO especialista financeiro brasileiro.
 
-Responda SEMPRE em português.
+Responda em português.
 
 Empresa:
 
 ${settings.companyName || "Empresa"}
 
-Receita total:
+Receitas:
 
 ${receitas}
 
-Despesas totais:
+Despesas:
 
 ${despesas}
 
@@ -231,11 +206,11 @@ Saldo atual:
 
 ${saldo}
 
-Previsão financeira 90 dias:
+Previsão 90 dias:
 
 ${previsao90dias}
 
-Score financeiro:
+Score:
 
 ${score}
 
@@ -259,9 +234,9 @@ Responda:
 
 3 Conselho do dia.
 
-4 Oportunidade de crescimento.
+4 Oportunidade.
 
-Resposta curta objetiva.
+Resposta curta.
 
 `;
 
@@ -269,18 +244,18 @@ const resposta = await gerarIA(prompt);
 
 
 // ====================
-// FALLBACK (NUNCA FICA SEM)
+// FALLBACK
 // ====================
 
 const fallback = `
 
 Empresa ${settings.companyName || ""}
 
-Score Financeiro: ${score}/100.
+Score Financeiro ${score}/100.
 
 Risco ${risco}.
 
-Controle despesas fixas, aumente entrada de caixa e revise créditos ativos semanalmente.
+Controle despesas fixas e aumente caixa.
 
 `;
 
@@ -309,6 +284,7 @@ result:"Erro IA backend"
 }
 
 });
+
 
 // =======================
 
