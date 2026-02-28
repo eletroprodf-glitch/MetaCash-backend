@@ -41,7 +41,7 @@ try{
 
 const response = await fetch(
 
-`https://api-inference.huggingface.co/models/${modelo}`,
+`https://router.huggingface.co/hf-inference/models/${modelo}`,
 
 {
 
