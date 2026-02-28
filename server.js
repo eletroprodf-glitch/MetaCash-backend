@@ -11,20 +11,20 @@ app.use(cors());
 app.use(express.json());
 
 
-// =======================
+// =====================
 // SAUDE
-// =======================
+// =====================
 
 app.get("/saude",(req,res)=>{
 
-res.send("Backend OK ✅");
+res.send("Backend CEO ONLINE");
 
 });
 
 
-// =======================
-// IA
-// =======================
+// =====================
+// IA GEMINI CEO
+// =====================
 
 async function gerarIA(prompt){
 
@@ -32,7 +32,7 @@ try{
 
 const response = await fetch(
 
-"https://router.huggingface.co/v1/chat/completions",
+`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API}`,
 
 {
 
@@ -40,26 +40,29 @@ method:"POST",
 
 headers:{
 
-Authorization:`Bearer ${process.env.HF_API}`,
 "Content-Type":"application/json"
 
 },
 
 body:JSON.stringify({
 
-model:"meta-llama/Llama-3.1-8B-Instruct",
-
-messages:[
+contents:[
 
 {
-role:"user",
-content:prompt
+
+parts:[
+
+{
+
+text:prompt
+
 }
 
-],
+]
 
-max_tokens:250,
-temperature:0.3
+}
+
+]
 
 })
 
@@ -69,9 +72,11 @@ temperature:0.3
 
 const data = await response.json();
 
-return data?.choices?.[0]?.message?.content || null;
+return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
 
-}catch{
+}catch(e){
+
+console.log(e);
 
 return null;
 
@@ -81,11 +86,11 @@ return null;
 
 
 
-// =======================
-// INSIGHT SAAS CFO
-// =======================
+// =====================
+// CFO CEO MODE
+// =====================
 
-app.post("/api/insight", async (req,res)=>{
+app.post("/api/insight",async(req,res)=>{
 
 try{
 
@@ -98,20 +103,11 @@ loans=[]
 }=req.body;
 
 
-// DEBUG (IMPORTANTE)
-
-console.log("TRANSACTIONS RECEBIDO:");
-
-console.log(transactions);
-
-
-// ====================
-// NORMALIZAÇÃO
-// ====================
+// normaliza texto
 
 function tipo(t){
 
-return String(t || "")
+return String(t||"")
 
 .toLowerCase()
 
@@ -122,22 +118,20 @@ return String(t || "")
 }
 
 
-// ====================
-// RECEITAS
-// ====================
+// receitas
 
 const receitas = transactions
 
 .filter(t=>{
 
-const tp = tipo(t.type);
+const tp=tipo(t.type);
 
 return(
 
-tp.includes("income") ||
-tp.includes("receita") ||
-tp.includes("entrada") ||
-tp.includes("ganho") ||
+tp.includes("income")||
+tp.includes("receita")||
+tp.includes("entrada")||
+tp.includes("ganho")||
 tp.includes("credito")
 
 );
@@ -147,21 +141,19 @@ tp.includes("credito")
 .reduce((a,b)=>a+Number(b.amount||0),0);
 
 
-// ====================
-// DESPESAS
-// ====================
+// despesas
 
 const despesas = transactions
 
 .filter(t=>{
 
-const tp = tipo(t.type);
+const tp=tipo(t.type);
 
 return(
 
-tp.includes("expense") ||
-tp.includes("despesa") ||
-tp.includes("saida") ||
+tp.includes("expense")||
+tp.includes("despesa")||
+tp.includes("saida")||
 tp.includes("gasto")
 
 );
@@ -174,13 +166,10 @@ tp.includes("gasto")
 
 const saldo = receitas - despesas;
 
-
-// previsão
-
 const previsao90dias = saldo - ((despesas/30)*90);
 
 
-// score matemático
+// score CEO
 
 let score=100;
 
@@ -208,13 +197,20 @@ risco="medio";
 }
 
 
-// ====================
-// PROMPT SAAS
-// ====================
+// PROMPT CEO
 
-const prompt=`
+const prompt = `
 
-Você é CFO brasileiro.
+Você é um CFO executivo de grandes empresas brasileiras.
+
+Responda EXTREMAMENTE PROFISSIONAL.
+
+SEM markdown.
+SEM **.
+SEM emojis.
+SEM textos longos.
+
+Máximo 3 frases.
 
 Empresa:
 
@@ -224,7 +220,7 @@ Receita:
 
 ${receitas}
 
-Despesa:
+Despesas:
 
 ${despesas}
 
@@ -240,33 +236,27 @@ Risco:
 
 ${risco}
 
-Responda curto:
-
-Situação:
-Problema:
-Conselho:
+Faça análise executiva direta.
 
 `;
 
 const resposta = await gerarIA(prompt);
 
 
-// fallback
+// fallback CEO
 
 const fallback =
 
-`Situação financeira ${risco}.
-Score ${score}/100.
-Revise despesas.`;
+`Fluxo financeiro ${risco}. Score ${score}/100. Priorize aumento de receita e redução de custos.`;
 
 
 res.json({
 
 result:resposta || fallback,
 
-saldo,
 receitas,
 despesas,
+saldo,
 score,
 risco
 
@@ -278,7 +268,7 @@ console.log(e);
 
 res.status(500).json({
 
-result:"Erro IA"
+result:"Erro CFO"
 
 });
 
@@ -287,12 +277,12 @@ result:"Erro IA"
 });
 
 
-// =======================
+// =====================
 
-const PORT = process.env.PORT || 5000;
+const PORT=process.env.PORT||5000;
 
 app.listen(PORT,()=>{
 
-console.log("🔥 CFO SAAS ONLINE");
+console.log("CEO MODE ONLINE");
 
 });
