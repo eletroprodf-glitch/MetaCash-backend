@@ -34,68 +34,36 @@ res.send("🔥 CEO ONLINE");
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 
-async function gerarGemini(prompt){
+import axios from "axios";
 
-try{
+async function chamarGemini(prompt){
 
-if(!GEMINI_KEY){
+const response = await axios.post(
 
-console.log("SEM API KEY");
-
-return null;
-
-}
-
-const response = await fetch(
-
-`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
 
 {
-
-method:"POST",
-
-headers:{
-
-"Content-Type":"application/json"
-
-},
-
-body:JSON.stringify({
 
 contents:[{
 
 parts:[{
 
-text:prompt.slice(0,15000)
+text: prompt
 
 }]
 
-}],
-
-generationConfig:{
-
-temperature:0.25,
-
-maxOutputTokens:250
-
-}
-
-})
+}]
 
 }
 
 );
 
-const text = await response.text();
-
-console.log("Gemini:",text.substring(0,200));
-
-if(!text.startsWith("{")){
-
-return null;
+return response.data
+.candidates?.[0]
+?.content?.parts?.[0]
+?.text;
 
 }
-
 const data = JSON.parse(text);
 
 return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
@@ -110,7 +78,13 @@ return null;
 
 }
 
+let resposta = await chamarGemini(prompt);
 
+if(!resposta){
+
+resposta = "IA não conseguiu analisar totalmente, porém o projeto foi recebido.";
+
+}
 
 // ===== CFO =====
 
@@ -253,50 +227,80 @@ message:"Erro CRM"
 
 // ===== PDF ANALYZER =====
 
-app.post("/api/analisar-projeto", async(req,res)=>{
+app.post("/api/analisar", upload.single("pdf"), async(req,res)=>{
 
 try{
 
-const {conteudoProjeto=""} = req.body;
+let texto = await extrairTexto(req.file.buffer);
 
-if(!conteudoProjeto){
+if(texto.length < 200){
 
-return res.status(400).json({
+texto = await fazerOCR(req.file.buffer);
 
-erro:"Sem texto"
+}
+
+texto = texto.slice(0,15000);
+
+const prompt = montarPrompt(texto);
+
+const resposta = await chamarGemini(prompt);
+
+res.json({
+
+resultado: resposta,
+resposta:"Projeto analisado com sucesso"
+
+});
+
+}catch(e){
+
+console.log(e);
+
+res.status(500).json({
+
+erro:"Falha análise"
 
 });
 
 }
 
+});// ===== PROMPT GOD MODE =====
 
-// ===== PROMPT GOD MODE =====
+function montarPrompt(texto){
 
-const prompt = `
+return `
 
-Você é engenheiro eletricista especialista em projetos residenciais brasileiros.
+Você é um engenheiro civil especialista em leitura de projetos arquitetônicos.
 
-Analise o texto do projeto abaixo.
+Analise COMPLETAMENTE o texto abaixo.
+
+Mesmo bagunçado ou incompleto:
 
 Extraia:
 
-1) Metros de fita LED.
-2) Tipos de luminárias.
-3) Quantidade pontos de luz.
-4) Tomadas totais.
-5) TUG.
-6) TUE.
-7) Interruptores.
-8) Circuitos elétricos.
-9) Disjuntores estimados.
-10) Observações técnicas.
+- Cliente
+- Endereço
+- Responsável técnico
+- Ambientes
+- Áreas m²
+- Demolições
+- Construções
+- Layout
+- Iluminação
+- Quantidade luminárias
+- Potência
+- BTUs ar condicionado
+- Observações técnicas.
 
-RESPONDA SOMENTE JSON.
+Organize como RELATÓRIO PROFISSIONAL.
 
-Formato obrigatório:
+Texto:
 
-{
+${texto}
 
+`;
+
+}
 "lighting":{
 
 "ledStripsMeters":0,
