@@ -6,21 +6,58 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+
+// =======================
+// MIDDLEWARES
+// =======================
+
+app.use(cors({
+
+origin:"*"
+
+}));
+
+app.use(express.json({
+
+limit:"10mb"
+
+}));
 
 
 // =======================
-// GEMINI IA
+// GEMINI CONFIG
+// =======================
+
+const GEMINI_KEY = process.env.GEMINI_API_KEY;
+
+if(!GEMINI_KEY){
+
+console.error("❌ GEMINI_API_KEY NÃO ENCONTRADA");
+
+}
+
+
+
+// =======================
+// GEMINI FUNCTION
 // =======================
 
 async function gerarGemini(prompt){
 
 try{
 
+const controller = new AbortController();
+
+const timeout = setTimeout(()=>{
+
+controller.abort();
+
+},25000);
+
+
 const response = await fetch(
 
-`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API}`,
+`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
 
 {
 
@@ -31,6 +68,8 @@ headers:{
 "Content-Type":"application/json"
 
 },
+
+signal:controller.signal,
 
 body:JSON.stringify({
 
@@ -47,7 +86,8 @@ text:prompt
 generationConfig:{
 
 temperature:0.25,
-maxOutputTokens:150
+
+maxOutputTokens:250
 
 }
 
@@ -57,13 +97,15 @@ maxOutputTokens:150
 
 );
 
+clearTimeout(timeout);
+
 const data = await response.json();
 
 return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
 
 }catch(e){
 
-console.log(e);
+console.log("ERRO GEMINI:",e);
 
 return null;
 
@@ -72,9 +114,16 @@ return null;
 }
 
 
+
 // =======================
-// SAUDE
+// HEALTH CHECK (RENDER)
 // =======================
+
+app.get("/",(req,res)=>{
+
+res.send("🔥 MetaCash CEO ONLINE");
+
+});
 
 app.get("/saude",(req,res)=>{
 
@@ -83,8 +132,9 @@ res.send("🔥 CEO ONLINE");
 });
 
 
+
 // =======================
-// CFO INSIGHT (VOLTOU)
+// CFO FINANCEIRO
 // =======================
 
 app.post("/api/insight", async(req,res)=>{
@@ -99,49 +149,51 @@ settings={}
 }=req.body;
 
 
+
 const receitas = transactions
 
 .filter(t=>t.type==="income")
 
-.reduce((a,b)=>a+(b.amount||0),0);
+.reduce((a,b)=>a+(Number(b.amount)||0),0);
 
 
 const despesas = transactions
 
 .filter(t=>t.type==="expense")
 
-.reduce((a,b)=>a+(b.amount||0),0);
+.reduce((a,b)=>a+(Number(b.amount)||0),0);
 
 
 const saldo = receitas - despesas;
 
 
+
 const prompt = `
 
-Você é CFO brasileiro.
+Você é CFO brasileiro profissional.
 
 Empresa:
 
 ${settings.companyName || "Empresa"}
 
-Receita:
+Receita total:
 
 ${receitas}
 
-Despesa:
+Despesa total:
 
 ${despesas}
 
-Saldo:
+Saldo atual:
 
 ${saldo}
 
-Responda curto.
+Analise curto:
 
 Situação:
-Problema:
-Conselho:
+Risco:
 Oportunidade:
+Conselho CEO direto.
 
 `;
 
@@ -154,11 +206,11 @@ result:
 
 resposta ||
 
-"Controle despesas e fortaleça entrada de caixa.",
+"Fluxo de caixa precisa atenção. Revise despesas e fortaleça receitas.",
 
-score:100,
+score: saldo > 0 ? 90 : 60,
 
-risco:"baixo"
+risco: saldo > 0 ? "baixo" : "alto"
 
 });
 
@@ -177,8 +229,9 @@ result:"Erro IA"
 });
 
 
+
 // =======================
-// CRM CEO MESSAGE
+// CRM WHATSAPP CEO
 // =======================
 
 app.post("/api/crm-message", async(req,res)=>{
@@ -187,24 +240,25 @@ try{
 
 const {
 
-contact,
+contact={},
 settings={}
 
 }=req.body;
 
+
 const prompt = `
 
-Crie mensagem WhatsApp profissional.
+Você é especialista vendas WhatsApp.
 
 Empresa:
 
-${settings.companyName}
+${settings.companyName || "Empresa"}
 
 Cliente:
 
-${contact.name}
+${contact.name || "Cliente"}
 
-Mensagem curta CEO.
+Crie mensagem curta profissional persuasiva.
 
 `;
 
@@ -216,7 +270,7 @@ message:
 
 mensagem ||
 
-"Gostaria de saber se posso ajudar em algo hoje."
+"Olá! Gostaria de saber se posso ajudar em algo hoje."
 
 });
 
@@ -226,7 +280,7 @@ console.log(e);
 
 res.status(500).json({
 
-message:"Erro"
+message:"Erro IA"
 
 });
 
@@ -235,12 +289,15 @@ message:"Erro"
 });
 
 
+
+// =======================
+// START SERVER
 // =======================
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
 app.listen(PORT,()=>{
 
-console.log("🔥 CEO BACKEND RODANDO");
+console.log("🔥 CEO BACKEND ONLINE PORT:",PORT);
 
 });
