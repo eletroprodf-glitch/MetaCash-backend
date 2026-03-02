@@ -269,19 +269,71 @@ erro:"Sem texto"
 
 }
 
-const prompt=`
 
-Você é engenheiro eletricista.
+// ===== PROMPT GOD MODE =====
 
-Analise projeto.
+const prompt = `
+
+Você é engenheiro eletricista especialista em projetos residenciais brasileiros.
+
+Analise o texto do projeto abaixo.
 
 Extraia:
 
-metros LED
-tomadas
-circuitos
+1) Metros de fita LED.
+2) Tipos de luminárias.
+3) Quantidade pontos de luz.
+4) Tomadas totais.
+5) TUG.
+6) TUE.
+7) Interruptores.
+8) Circuitos elétricos.
+9) Disjuntores estimados.
+10) Observações técnicas.
 
-Resumo técnico.
+RESPONDA SOMENTE JSON.
+
+Formato obrigatório:
+
+{
+
+"lighting":{
+
+"ledStripsMeters":0,
+
+"fixtureTypes":[],
+
+"lightPoints":0
+
+},
+
+"outletsAndSwitches":{
+
+"totalOutlets":0,
+
+"tugOutlets":0,
+
+"tueOutlets":0,
+
+"switches":0,
+
+"relocations":""
+
+},
+
+"electricalDistribution":{
+
+"circuits":0,
+
+"breakers":0,
+
+"installedLoad":""
+
+},
+
+"observations":""
+
+}
 
 Projeto:
 
@@ -289,17 +341,51 @@ ${conteudoProjeto.slice(0,15000)}
 
 `;
 
+
 const resposta = await gerarGemini(prompt);
 
-res.json({
+
+// ===== SEGURANÇA JSON =====
+
+if(!resposta){
+
+return res.json({
 
 resultado:null,
 
-resposta:
+resposta:"IA não encontrou informações."
 
-resposta ||
+});
 
-"Projeto analisado."
+}
+
+
+let jsonIA;
+
+try{
+
+jsonIA = JSON.parse(resposta);
+
+}catch{
+
+return res.json({
+
+resultado:null,
+
+resposta:resposta
+
+});
+
+}
+
+
+// ===== SUCESSO =====
+
+res.json({
+
+resultado:jsonIA,
+
+resposta:"Projeto analisado com sucesso."
 
 });
 
@@ -316,7 +402,6 @@ erro:"Erro GOD MODE"
 }
 
 });
-
 
 const PORT = process.env.PORT || 10000;
 
