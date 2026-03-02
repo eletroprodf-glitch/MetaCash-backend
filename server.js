@@ -10,13 +10,15 @@ app.use(cors());
 app.use(express.json());
 
 
-// ================= GEMINI CEO
+// =======================
+// GEMINI IA
+// =======================
 
-async function gemini(prompt){
+async function gerarGemini(prompt){
 
 try{
 
-const r = await fetch(
+const response = await fetch(
 
 `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API}`,
 
@@ -45,7 +47,7 @@ text:prompt
 generationConfig:{
 
 temperature:0.25,
-maxOutputTokens:160
+maxOutputTokens:150
 
 }
 
@@ -55,13 +57,13 @@ maxOutputTokens:160
 
 );
 
-const data = await r.json();
+const data = await response.json();
 
-return data?.candidates?.[0]?.content?.parts?.[0]?.text;
+return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
 
 }catch(e){
 
-console.log("Gemini erro:",e);
+console.log(e);
 
 return null;
 
@@ -70,190 +72,93 @@ return null;
 }
 
 
-
-// ================= SAUDE
+// =======================
+// SAUDE
+// =======================
 
 app.get("/saude",(req,res)=>{
 
-res.send("🔥 APOCALIPSE CEO ONLINE");
+res.send("🔥 CEO ONLINE");
 
 });
 
 
+// =======================
+// CFO INSIGHT (VOLTOU)
+// =======================
 
-// ================= CRM CEO MESSAGE
-
-app.post("/api/crm-message",async(req,res)=>{
+app.post("/api/insight", async(req,res)=>{
 
 try{
 
-const{
+const {
 
-contact,
-budgets=[],
-loans=[],
-activities=[],
+transactions=[],
 settings={}
 
 }=req.body;
 
 
-// ===== HISTORICO
+const receitas = transactions
 
-const orcamentos = budgets.filter(
+.filter(t=>t.type==="income")
 
-b=>b.clientName===contact.name
-
-);
-
-const emprestimos = loans.filter(
-
-l=>l.clientName===contact.name
-
-);
+.reduce((a,b)=>a+(b.amount||0),0);
 
 
-// ===== ULTIMA ATIVIDADE
+const despesas = transactions
 
-let diasSemContato=999;
+.filter(t=>t.type==="expense")
 
-const ultAtividade = activities
-
-.filter(a=>a.contactId===contact.id)
-
-.sort((a,b)=>
-
-new Date(b.createdAt)-new Date(a.createdAt)
-
-)[0];
-
-if(ultAtividade){
-
-const hoje=new Date();
-
-const ult=new Date(ultAtividade.createdAt);
-
-diasSemContato=Math.floor(
-
-(hoje-ult)/(1000*60*60*24)
-
-);
-
-}
+.reduce((a,b)=>a+(b.amount||0),0);
 
 
-
-// ===== SCORE CLIENTE
-
-let score=30;
-
-if(emprestimos.length) score+=30;
-
-if(orcamentos.some(o=>o.status==="ACCEPTED")) score+=30;
-
-if(orcamentos.some(o=>o.status==="PENDING")) score+=15;
-
-if(diasSemContato>30) score-=10;
-
-if(score>100)score=100;
+const saldo = receitas - despesas;
 
 
+const prompt = `
 
-// ===== TEMPERATURA
-
-let temp="frio";
-
-if(score>=70) temp="quente";
-else if(score>=50) temp="morno";
-
-
-
-// ===== CONTEXTO
-
-let contexto="novo lead";
-
-const accepted = orcamentos.find(o=>o.status==="ACCEPTED");
-
-const pending = orcamentos.find(o=>o.status==="PENDING");
-
-if(emprestimos.length){
-
-contexto="cliente possui contrato ativo";
-
-}
-
-else if(accepted){
-
-contexto=`já realizou ${accepted.items?.[0]?.description||"serviço"} conosco`;
-
-}
-
-else if(pending){
-
-contexto=`orçamento pendente ${pending.items?.[0]?.description||""}`;
-
-}
-
-
-
-// ===== FOLLOWUP AUTOMATICO
-
-let followup="";
-
-if(diasSemContato>20){
-
-followup="cliente está há muito tempo sem contato.";
-
-}
-
-
-
-// ===== PROMPT CEO
-
-const prompt=`
-
-Você é especialista em relacionamento premium brasileiro.
+Você é CFO brasileiro.
 
 Empresa:
 
-${settings.companyName}
+${settings.companyName || "Empresa"}
 
-Cliente:
+Receita:
 
-${contact.name}
+${receitas}
 
-Contexto:
+Despesa:
 
-${contexto}
+${despesas}
 
-Temperatura:
+Saldo:
 
-${temp}
+${saldo}
 
-Score:
+Responda curto.
 
-${score}
-
-${followup}
-
-Crie UMA mensagem WhatsApp:
-
-Profissional.
-Curta.
-Tom CEO.
-Venda sem parecer venda.
-Sem emoji.
+Situação:
+Problema:
+Conselho:
+Oportunidade:
 
 `;
 
-const msg = await gemini(prompt);
+const resposta = await gerarGemini(prompt);
+
 
 res.json({
 
-message: msg || "Gostaria de saber se posso ajudar em algo hoje.",
-score,
-temperatura:temp,
-diasSemContato
+result:
+
+resposta ||
+
+"Controle despesas e fortaleça entrada de caixa.",
+
+score:100,
+
+risco:"baixo"
 
 });
 
@@ -263,7 +168,7 @@ console.log(e);
 
 res.status(500).json({
 
-message:"erro IA"
+result:"Erro IA"
 
 });
 
@@ -272,11 +177,70 @@ message:"erro IA"
 });
 
 
+// =======================
+// CRM CEO MESSAGE
+// =======================
+
+app.post("/api/crm-message", async(req,res)=>{
+
+try{
+
+const {
+
+contact,
+settings={}
+
+}=req.body;
+
+const prompt = `
+
+Crie mensagem WhatsApp profissional.
+
+Empresa:
+
+${settings.companyName}
+
+Cliente:
+
+${contact.name}
+
+Mensagem curta CEO.
+
+`;
+
+const mensagem = await gerarGemini(prompt);
+
+res.json({
+
+message:
+
+mensagem ||
+
+"Gostaria de saber se posso ajudar em algo hoje."
+
+});
+
+}catch(e){
+
+console.log(e);
+
+res.status(500).json({
+
+message:"Erro"
+
+});
+
+}
+
+});
+
+
+// =======================
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT,()=>{
 
-console.log("🔥 APOCALIPSE CEO RODANDO");
+console.log("🔥 CEO BACKEND RODANDO");
 
 });
