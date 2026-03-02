@@ -9,26 +9,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// =========================
-// SAUDE
-// =========================
 
-app.get("/saude",(req,res)=>{
+// ================= GEMINI CEO
 
-res.send("Backend CEO OK 🚀");
-
-});
-
-
-// =========================
-// GEMINI CEO
-// =========================
-
-async function gerarIA(prompt){
+async function gemini(prompt){
 
 try{
 
-const response = await fetch(
+const r = await fetch(
 
 `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API}`,
 
@@ -44,29 +32,20 @@ headers:{
 
 body:JSON.stringify({
 
-contents:[
+contents:[{
 
-{
-
-parts:[
-
-{
+parts:[{
 
 text:prompt
 
-}
+}]
 
-]
-
-}
-
-],
+}],
 
 generationConfig:{
 
-temperature:0.4,
-
-maxOutputTokens:220
+temperature:0.25,
+maxOutputTokens:160
 
 }
 
@@ -76,15 +55,13 @@ maxOutputTokens:220
 
 );
 
-const data = await response.json();
+const data = await r.json();
 
-console.log("GEMINI RESPONSE:",data);
-
-return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+return data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
 }catch(e){
 
-console.log("Erro Gemini:",e);
+console.log("Gemini erro:",e);
 
 return null;
 
@@ -94,155 +71,189 @@ return null;
 
 
 
-// =========================
-// INSIGHT CFO CEO
-// =========================
+// ================= SAUDE
 
-app.post("/api/insight", async (req,res)=>{
+app.get("/saude",(req,res)=>{
+
+res.send("🔥 APOCALIPSE CEO ONLINE");
+
+});
+
+
+
+// ================= CRM CEO MESSAGE
+
+app.post("/api/crm-message",async(req,res)=>{
 
 try{
 
-const {
+const{
 
-transactions=[],
+contact,
 budgets=[],
 loans=[],
+activities=[],
 settings={}
 
 }=req.body;
 
 
-// ================= CALCULOS
+// ===== HISTORICO
 
-const receitas = transactions
-.filter(t=>t.type==="income")
-.reduce((a,b)=>a+(Number(b.amount)||0),0);
+const orcamentos = budgets.filter(
 
-const despesas = transactions
-.filter(t=>t.type==="expense")
-.reduce((a,b)=>a+(Number(b.amount)||0),0);
+b=>b.clientName===contact.name
 
-const saldo = receitas - despesas;
+);
 
-const mediaDespesa = despesas / 30;
+const emprestimos = loans.filter(
 
-const previsao90dias = saldo - (mediaDespesa*90);
+l=>l.clientName===contact.name
+
+);
 
 
-// ================= SCORE
+// ===== ULTIMA ATIVIDADE
 
-let score = 100;
+let diasSemContato=999;
 
-if(despesas > receitas) score -=40;
+const ultAtividade = activities
 
-if(loans.length>0) score -=15;
+.filter(a=>a.contactId===contact.id)
 
-if(previsao90dias<0) score -=35;
+.sort((a,b)=>
 
-if(score<0) score=0;
+new Date(b.createdAt)-new Date(a.createdAt)
 
+)[0];
 
-// ================= RISCO
+if(ultAtividade){
 
-let risco="baixo";
+const hoje=new Date();
 
-if(previsao90dias<0){
+const ult=new Date(ultAtividade.createdAt);
 
-risco="alto";
+diasSemContato=Math.floor(
 
-}else if(previsao90dias < saldo*0.5){
+(hoje-ult)/(1000*60*60*24)
 
-risco="medio";
+);
 
 }
 
 
-// ================= PROMPT CEO
 
-const prompt = `
+// ===== SCORE CLIENTE
 
-Você é um CFO CEO brasileiro especialista em empresas SaaS.
+let score=30;
 
-Analise APENAS números.
+if(emprestimos.length) score+=30;
 
-Nunca diga que não existe receita quando houver valor maior que zero.
+if(orcamentos.some(o=>o.status==="ACCEPTED")) score+=30;
+
+if(orcamentos.some(o=>o.status==="PENDING")) score+=15;
+
+if(diasSemContato>30) score-=10;
+
+if(score>100)score=100;
+
+
+
+// ===== TEMPERATURA
+
+let temp="frio";
+
+if(score>=70) temp="quente";
+else if(score>=50) temp="morno";
+
+
+
+// ===== CONTEXTO
+
+let contexto="novo lead";
+
+const accepted = orcamentos.find(o=>o.status==="ACCEPTED");
+
+const pending = orcamentos.find(o=>o.status==="PENDING");
+
+if(emprestimos.length){
+
+contexto="cliente possui contrato ativo";
+
+}
+
+else if(accepted){
+
+contexto=`já realizou ${accepted.items?.[0]?.description||"serviço"} conosco`;
+
+}
+
+else if(pending){
+
+contexto=`orçamento pendente ${pending.items?.[0]?.description||""}`;
+
+}
+
+
+
+// ===== FOLLOWUP AUTOMATICO
+
+let followup="";
+
+if(diasSemContato>20){
+
+followup="cliente está há muito tempo sem contato.";
+
+}
+
+
+
+// ===== PROMPT CEO
+
+const prompt=`
+
+Você é especialista em relacionamento premium brasileiro.
 
 Empresa:
 
-${settings.companyName || "Empresa"}
+${settings.companyName}
 
-Receita mensal:
+Cliente:
 
-${receitas}
+${contact.name}
 
-Despesas mensais:
+Contexto:
 
-${despesas}
+${contexto}
 
-Saldo:
+Temperatura:
 
-${saldo}
-
-Previsão 90 dias:
-
-${previsao90dias}
+${temp}
 
 Score:
 
-${score}/100
+${score}
 
-Risco:
+${followup}
 
-${risco}
+Crie UMA mensagem WhatsApp:
 
-Créditos ativos:
-
-${loans.length}
-
-Responda curto profissional.
-
-Formato:
-
-Situação:
-Problema:
-Conselho:
-Oportunidade:
-
-Máximo 4 linhas.
-
-Tom CEO direto.
+Profissional.
+Curta.
+Tom CEO.
+Venda sem parecer venda.
+Sem emoji.
 
 `;
 
-
-// ================= IA
-
-const resposta = await gerarIA(prompt);
-
-
-// ================= FALLBACK
-
-const fallback = `
-
-Situação: Receita ${receitas>0?"positiva":"crítica"} com saldo ${saldo}.
-
-Problema: despesas elevadas ou projeção negativa.
-
-Conselho: priorize caixa e corte custos variáveis.
-
-Oportunidade: expandir vendas mantendo margem.
-
-`;
+const msg = await gemini(prompt);
 
 res.json({
 
-result: resposta || fallback,
-
+message: msg || "Gostaria de saber se posso ajudar em algo hoje.",
 score,
-
-risco,
-
-previsao90dias
+temperatura:temp,
+diasSemContato
 
 });
 
@@ -252,7 +263,7 @@ console.log(e);
 
 res.status(500).json({
 
-result:"Erro backend CEO"
+message:"erro IA"
 
 });
 
@@ -261,12 +272,11 @@ result:"Erro backend CEO"
 });
 
 
-// =========================
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT,()=>{
 
-console.log("🔥 Backend GEMINI CEO rodando");
+console.log("🔥 APOCALIPSE CEO RODANDO");
 
 });
