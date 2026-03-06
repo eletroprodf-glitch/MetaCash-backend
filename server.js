@@ -29,6 +29,57 @@ res.send("🔥 CEO ONLINE");
 
 });
 
+app.post("/api/financeiro", async (req,res)=>{
+
+const { receitas, despesas } = req.body;
+
+const prompt = `
+Analise o fluxo financeiro desta empresa:
+
+Receitas:
+${JSON.stringify(receitas)}
+
+Despesas:
+${JSON.stringify(despesas)}
+
+Retorne:
+
+- diagnóstico financeiro
+- riscos
+- sugestões de crescimento
+`;
+
+const resposta = await model.generateContent(prompt);
+
+res.json({
+resultado: resposta.response.text()
+});
+
+});
+app.post("/api/crm", async (req,res)=>{
+
+const { nome, servico, cidade } = req.body;
+
+const prompt = `
+Crie uma mensagem curta para WhatsApp.
+
+Cliente: ${nome}
+Serviço solicitado: ${servico}
+Cidade: ${cidade}
+
+Objetivo:
+agradecer contato e perguntar se precisa de mais algum serviço.
+
+Tom profissional.
+`;
+
+const resposta = await model.generateContent(prompt);
+
+res.json({
+mensagem: resposta.response.text()
+});
+
+});
 
 // ===== GEMINI =====
 
